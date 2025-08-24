@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Music</title>
+  <meta name="description" content="A super simple GitHub Pages music site with playlist + drag & drop preview." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=League+Spartan:ital,wght@0,400;0,700;1,700;1,800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --brand-red: #E41B13; }
+    html, body { height: 100%; }
+    body { font-family: 'League Spartan', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    /* "Supreme"-style heading: Futura Heavy Oblique lookalike using League Spartan italic */
+    .supreme-font { font-family: 'League Spartan', Futura, 'Futura PT', Arial, sans-serif; font-style: italic; font-weight: 800; letter-spacing: 0.2px; }
+    .box-logo { background: var(--brand-red); color: white; padding: 0.15rem 0.5rem; border-radius: 0.375rem; display: inline-block; }
+    /* Hide native file input */
+    input[type="file"] { display: none; }
+    .scrollbar-thin { scrollbar-width: thin; }
+  </style>
+</head>
+<body class="min-h-full bg-zinc-950 text-zinc-100">
+  <main class="max-w-5xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="box-logo supreme-font text-2xl leading-none">music</span>
+        <h1 class="supreme-font text-xl sm:text-2xl">My GitHub Player</h1>
+      </div>
+      <div class="flex items-center gap-2 text-sm opacity-90">
+        <a id="gh-upload-link" href="#" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition">➕ Add songs</a>
+        <a id="gh-repo-link" href="#" target="_blank" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 transition">↗ Repo</a>
+      </div>
+    </header>
+
+    <!-- Config Helper Notice -->
+    <section id="configNotice" class="mt-4 hidden">
+      <div class="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+        <p class="text-sm">Heads up: set your <code>owner</code>, <code>repo</code>, and <code>branch</code> in the <span class="font-mono">CONFIG</span> block in this file so the site can auto-list audio from your <span class="font-mono">/music</span> folder.</p>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="mt-6 grid gap-4 sm:grid-cols-3">
+      <div class="sm:col-span-2 flex items-center gap-3">
+        <div class="flex-1">
+          <input id="search" type="text" placeholder="Search your songs…" class="w-full rounded-xl bg-zinc-900 border border-zinc-800 px-4 py-3 outline-none focus:ring-2 focus:ring-zinc-600" />
+        </div>
+        <button id="refreshBtn" class="rounded-xl px-4 py-3 bg-zinc-800 hover:bg-zinc-700">⟳ Refresh</button>
+      </div>
+      <label class="block text-center rounded-2xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900 cursor-pointer p-3">
+        <input id="fileInput" type="file" accept="audio/*" multiple />
+        <div class="leading-tight">
+          <div class="font-semibold">Drag & drop or click to preview</div>
+          <div class="text-xs opacity-70">(Local preview only — use “Add songs” to upload to GitHub)</div>
+        </div>
+      </label>
+    </section>
+
+    <!-- Player Card -->
+    <section class="mt-6 grid gap-4 sm:grid-cols-3">
+      <div class="sm:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+        <div class="flex items-center justify-between">
+          <div class="min-w-0">
+            <div id="nowTitle" class="truncate text-lg font-semibold">Nothing playing</div>
+            <div id="nowMeta" class="truncate text-sm opacity-70">—</div>
+          </div>
+          <button id="clearLocalBtn" class="text-xs bg-zinc-800 hover:bg-zinc-700 rounded-lg px-3 py-1.5">Clear previews</button>
+        </div>
+        <div class="mt-3">
+          <audio id="player" controls class="w-full"></audio>
+        </div>
+      </div>
+
+      <!-- Quick Help -->
+      <aside class="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-sm leading-6">
+        <div class="font-semibold mb-1">How uploads work</div>
+        <ol class="list-decimal list-inside space-y-1 opacity-90">
+          <li>Click <span class="px-1 rounded bg-zinc-800">Add songs</span> to upload files into your repo’s <span class="font-mono">/music</span> folder.</li>
+          <li>This page auto-lists audio files from that folder.</li>
+          <li>Drag & drop lets you preview files locally (doesn’t save to GitHub).</li>
+        </ol>
+      </aside>
+    </section>
+
+    <!-- Playlist -->
+    <section class="mt-6">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="supreme-font text-lg">Playlist</h2>
+        <div id="count" class="text-xs opacity-70">0 tracks</div>
+      </div>
+      <div id="playlist" class="rounded-2xl border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800 max-h-[50vh] overflow-auto scrollbar-thin"></div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-10 pb-10 text-xs opacity-60">
+      Font note: the Supreme box logo uses Futura Heavy Oblique (licensed). This site uses a free look‑alike (League Spartan italic) for a similar vibe.
+    </footer>
+  </main>
+
+  <script>
+    // ========================
+    // CONFIG — CHANGE THESE
+    // ========================
+    const CONFIG = {
+      owner: 'your-username',   // ← your GitHub username
+      repo: 'your-repo',        // ← repository name (the one hosting this site)
+      branch: 'main',           // ← default branch for your repo (e.g. 'main' or 'gh-pages')
+      folder: 'music'           // ← folder inside the repo that holds audio files
+    };
+
+    // If CONFIG isn't changed yet, show the notice
+    if (CONFIG.owner === 'your-username' || CONFIG.repo === 'your-repo') {
+      document.getElementById('configNotice').classList.remove('hidden');
+    }
+
+    // Links to repo + upload page
+    const uploadUrl = `https://github.com/${CONFIG.owner}/${CONFIG.repo}/upload/${CONFIG.branch}/${CONFIG.folder}`;
+    const repoUrl = `https://github.com/${CONFIG.owner}/${CONFIG.repo}`;
+    document.getElementById('gh-upload-link').href = uploadUrl;
+    document.getElementById('gh-repo-link').href = repoUrl;
+
+    // Elements
+    const player = document.getElementById('player');
+    const nowTitle = document.getElementById('nowTitle');
+    const nowMeta = document.getElementById('nowMeta');
+    const playlistEl = document.getElementById('playlist');
+    const countEl = document.getElementById('count');
+    const searchEl = document.getElementById('search');
+
+    // State
+    let tracks = [];       // {title, artist, url, source}
+    let filtered = [];
+    let currentIndex = -1;
+
+    function extOK(name) {
+      return /(\.mp3|\.wav|\.ogg|\.m4a|\.aac|\.flac)$/i.test(name);
+    }
+
+    // Build one playlist row
+    function makeRow(track, i) {
+      const row = document.createElement('button');
+      row.className = 'w-full text-left px-4 py-3 hover:bg-zinc-800/60 focus:bg-zinc-800/60 transition flex items-center gap-3';
+      row.dataset.index = i;
+
+      const icon = document.createElement('div');
+      icon.textContent = '▶';
+      icon.className = 'shrink-0 opacity-70';
+
+      const info = document.createElement('div');
+      info.className = 'min-w-0';
+
+      const title = document.createElement('div');
+      title.className = 'truncate';
+      title.textContent = track.title || track.name || 'Untitled';
+
+      const meta = document.createElement('div');
+      meta.className = 'truncate text-xs opacity-60';
+      meta.textContent = track.artist ? `${track.artist} • ${track.source}` : track.source;
+
+      info.appendChild(title);
+      info.appendChild(meta);
+      row.appendChild(icon);
+      row.appendChild(info);
+
+      row.addEventListener('click', () => playAt(i));
+      return row;
+    }
+
+    function render(list = filtered) {
+      playlistEl.innerHTML = '';
+      list.forEach((t, i) => playlistEl.appendChild(makeRow(t, i)));
+      countEl.textContent = `${list.length} ${list.length === 1 ? 'track' : 'tracks'}`;
+    }
+
+    function playAt(i) {
+      if (i < 0 || i >= filtered.length) return;
+      currentIndex = i;
+      const t = filtered[i];
+      player.src = t.url;
+      player.play();
+      nowTitle.textContent = t.title || 'Untitled';
+      nowMeta.textContent = t.artist ? `${t.artist} • ${t.source}` : t.source;
+      // remember last
+      try { localStorage.setItem('lastTrackUrl', t.url); } catch (e) {}
+    }
+
+    // Next on ended
+    player.addEventListener('ended', () => {
+      if (currentIndex + 1 < filtered.length) playAt(currentIndex + 1);
+    });
+
+    // Search
+    searchEl.addEventListener('input', () => {
+      const q = searchEl.value.toLowerCase();
+      filtered = tracks.filter(t => (t.title||'').toLowerCase().includes(q));
+      render();
+    });
+
+    // Refresh from GitHub contents API
+    async function loadFromGitHub() {
+      const api = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.folder}?ref=${CONFIG.branch}`;
+      try {
+        const res = await fetch(api);
+        if (!res.ok) throw new Error('Failed to fetch repo contents');
+        const data = await res.json();
+        const ghTracks = (Array.isArray(data) ? data : []).filter(item => item.type === 'file' && extOK(item.name)).map(item => ({
+          title: decodeURIComponent(item.name.replace(/\.[^.]+$/, '')),
+          artist: '',
+          url: item.download_url,
+          source: 'GitHub'
+        }));
+        return ghTracks;
+      } catch (err) {
+        console.warn(err);
+        return [];
+      }
+    }
+
+    // Local drag & drop previews
+    const fileInput = document.getElementById('fileInput');
+    const clearLocalBtn = document.getElementById('clearLocalBtn');
+
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files || []);
+      const previews = files.filter(f => extOK(f.name)).map(f => ({
+        title: f.name.replace(/\.[^.]+$/, ''),
+        artist: '',
+        url: URL.createObjectURL(f),
+        source: 'Preview (not saved)'
+      }));
+      tracks = [...tracks, ...previews];
+      filtered = tracks;
+      render();
+      if (currentIndex === -1 && filtered.length) playAt(0);
+    });
+
+    clearLocalBtn.addEventListener('click', () => {
+      tracks = tracks.filter(t => t.source !== 'Preview (not saved)');
+      filtered = tracks;
+      render();
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', init);
+
+    async function init() {
+      const gh = await loadFromGitHub();
+      tracks = gh; // start clean with repo files
+      filtered = tracks;
+      render();
+
+      // If a last track exists and still in list, resume it
+      try {
+        const last = localStorage.getItem('lastTrackUrl');
+        const idx = filtered.findIndex(t => t.url === last);
+        if (idx >= 0) playAt(idx);
+      } catch (e) {}
+    }
+
+    // Kick off
+    init();
+  </script>
+</body>
+</html>
