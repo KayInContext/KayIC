@@ -106,7 +106,7 @@
     // ========================
     const CONFIG = {
       owner: 'KayInContext',   // ← your GitHub username
-      repo: 'KayIC',        // ← repository name (the one hosting this site)
+      repo: 'Music',        // ← repository name (the one hosting this site)
       branch: 'main',           // ← default branch for your repo (e.g. 'main' or 'gh-pages')
       folder: 'Music'           // ← folder inside the repo that holds audio files
     };
